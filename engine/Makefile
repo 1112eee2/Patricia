@@ -69,7 +69,11 @@ cross-aarch64-clang: CXXFLAGS := --target=aarch64-linux-gnu -O3 -std=c++20 -ffas
 cross-aarch64-clang: OUT := $(EXE)_aarch64$(SUFFIX)
 cross-aarch64-clang: $(SOURCES)
 	$(CXX) $(CXXFLAGS) $^ -o $(OUT) $(LINKER)
+SUFFIX := .exe
+OUT := $(EXE)$(SUFFIX)
+
 
 # ----------------------- Clean --------------------------------------------
 clean:
 	rm -f $(EXE)$(SUFFIX) $(EXE)_avx2$(SUFFIX) $(EXE)_avx2_bmi2$(SUFFIX) data$(SUFFIX)
+
