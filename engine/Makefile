@@ -3,7 +3,17 @@
 EXE := patricia
 SOURCES := src/patricia.cpp src/fathom/src/tbprobe.c
 
-CXX := clang++
+# --- Compiler selection ----------------------------------------------------
+# Allow override: `make CXX=g++` or `make CXX=clang++`
+# Default: prefer clang++ if available, else g++
+ifeq ($(origin CXX), undefined)
+  ifneq ($(shell command -v clang++ 2>/dev/null),)
+    CXX := clang++
+  else
+    CXX := g++
+  endif
+endif
+
 CXXFLAGS := -O3 -march=native -std=c++20 -ffast-math
 LINKER :=
 
@@ -29,7 +39,6 @@ datagen: datagen/datagen.cpp
 	$(CXX) $^ $(CXXFLAGS) -o data $(LINKER)
 
 # --- Native AArch64 build (on ARM host) -----------------------------------
-aarch64: CXX := clang++
 aarch64: CXXFLAGS := -O3 -std=c++20 -ffast-math -mcpu=native -pthread -static-libstdc++ -static-libgcc
 aarch64: OUT := $(EXE)_aarch64$(SUFFIX)
 aarch64: $(SOURCES)
