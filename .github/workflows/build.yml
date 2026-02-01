@@ -1,4 +1,4 @@
-name: Build Patricia (Windows)
+name: Build Patricia (Windows MSYS2)
 
 on:
   push:
@@ -9,37 +9,57 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Setup MSYS2
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: UCRT64
-          update: true
-          install: >
-            mingw-w64-ucrt-x86_64-clang
-            mingw-w64-ucrt-x86_64-make
+    # -------------------------------
+    # Setup MSYS2 (UCRT64)
+    # -------------------------------
+    - name: Setup MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: UCRT64
+        update: true
+        install: >
+          mingw-w64-ucrt-x86_64-clang
+          mingw-w64-ucrt-x86_64-make
+          mingw-w64-ucrt-x86_64-libc++
+          mingw-w64-ucrt-x86_64-toolchain
 
-      # ===== BUILD =====
-      - name: Build Patricia
-        shell: msys2 {0}
-        run: |
-          make -C engine
-          mkdir -p .bin
-          cp engine/patricia.exe .bin/
+    # -------------------------------
+    # Verify tools (debug safety net)
+    # -------------------------------
+    - name: Check toolchain
+      shell: msys2 {0}
+      run: |
+        clang++ --version
+        make --version
+        pwd
 
-      # ===== COPY DLLs (วิธีที่ 1) =====
-      - name: Bundle runtime DLLs
-        shell: msys2 {0}
-        run: |
-          cp /ucrt64/bin/libgcc_s_seh-1.dll .bin/
-          cp /ucrt64/bin/libstdc++-6.dll .bin/
-          cp /ucrt64/bin/libwinpthread-1.dll .bin/
+    # -------------------------------
+    # Build engine
+    # -------------------------------
+    - name: Build Patricia engine
+      shell: msys2 {0}
+      run: |
+        cd engine
+        make clean || true
+        make
 
-      # ===== UPLOAD =====
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: patricia-windows
-          path: .bin/*
+    # -------------------------------
+    # Rename output to .bin
+    # -------------------------------
+    - name: Rename output to .bin
+      shell: msys2 {0}
+      run: |
+        cd engine
+        mv patricia.exe patricia.bin
+
+    # -------------------------------
+    # Upload artifact
+    # -------------------------------
+    - name: Upload binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: patricia-windows-bin
+        path: engine/patricia.bin
