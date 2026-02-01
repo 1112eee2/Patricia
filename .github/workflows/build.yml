@@ -2,36 +2,44 @@ name: Build Patricia (Windows)
 
 on:
   push:
-    branches: [ main, master ]
   pull_request:
-  workflow_dispatch:
 
 jobs:
   build-windows:
     runs-on: windows-latest
 
     steps:
-      - name: Checkout source
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup MSYS2 (UCRT64 + clang)
+      - name: Setup MSYS2
         uses: msys2/setup-msys2@v2
         with:
           msystem: UCRT64
           update: true
-          install: >-
-            make
+          install: >
             mingw-w64-ucrt-x86_64-clang
+            mingw-w64-ucrt-x86_64-make
 
-      - name: Build engine
+      # ===== BUILD =====
+      - name: Build Patricia
         shell: msys2 {0}
         run: |
+          make -C engine
           mkdir -p .bin
-          make -C engine -B
           cp engine/patricia.exe .bin/
 
-      - name: Upload binary
+      # ===== COPY DLLs (วิธีที่ 1) =====
+      - name: Bundle runtime DLLs
+        shell: msys2 {0}
+        run: |
+          cp /ucrt64/bin/libgcc_s_seh-1.dll .bin/
+          cp /ucrt64/bin/libstdc++-6.dll .bin/
+          cp /ucrt64/bin/libwinpthread-1.dll .bin/
+
+      # ===== UPLOAD =====
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: patricia-windows
-          path: .bin/patricia.exe
+          path: .bin/*
