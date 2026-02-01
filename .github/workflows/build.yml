@@ -1,63 +1,59 @@
-name: Build Patricia (Windows MSYS2)
+name: Build (Windows MSYS2)
 
 on:
+  workflow_dispatch:
   push:
+    branches: [ "main" ]
   pull_request:
 
 jobs:
-  build-windows:
+  windows-msys2:
     runs-on: windows-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    # -------------------------------
-    # Setup MSYS2 (UCRT64)
-    # -------------------------------
-    - name: Setup MSYS2
-      uses: msys2/setup-msys2@v2
-      with:
-        msystem: UCRT64
-        update: true
-        install: >
-          mingw-w64-ucrt-x86_64-clang
-          mingw-w64-ucrt-x86_64-make
-          mingw-w64-ucrt-x86_64-toolchain
+      - name: Setup MSYS2 (UCRT64)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            make
+            mingw-w64-ucrt-x86_64-toolchain
+            mingw-w64-ucrt-x86_64-clang
+            mingw-w64-ucrt-x86_64-binutils
 
-    # -------------------------------
-    # Check toolchain
-    # -------------------------------
-    - name: Check toolchain
-      shell: msys2 {0}
-      run: |
-        clang++ --version
-        mingw32-make --version
+      - name: Check toolchain
+        shell: msys2 {0}
+        run: |
+          set -euxo pipefail
+          uname -a
+          clang++ --version
+          which clang++
+          which make
 
-    # -------------------------------
-    # Build engine
-    # -------------------------------
-    - name: Build Patricia engine
-      shell: msys2 {0}
-      run: |
-        cd engine
-        mingw32-make clean || true
-        mingw32-make
+      - name: Build (AVX2 + BMI2)
+        shell: msys2 {0}
+        run: |
+          set -euxo pipefail
+          cd engine
+          make clean || true
+          make avx2_bmi2
 
-    # -------------------------------
-    # Rename output to .bin
-    # -------------------------------
-    - name: Rename output to .bin
-      shell: msys2 {0}
-      run: |
-        cd engine
-        mv patricia.exe patricia.bin
+          # ตรวจชนิดไฟล์ที่ได้ (กันพลาดว่าไม่ได้เป็น Windows x64)
+          file patricia_avx2_bmi2.exe
 
-    # -------------------------------
-    # Upload artifact
-    # -------------------------------
-    - name: Upload binary
-      uses: actions/upload-artifact@v4
-      with:
-        name: patricia-windows-bin
-        path: engine/patricia.bin
+      - name: Package artifact (.bin folder)
+        shell: msys2 {0}
+        run: |
+          set -euxo pipefail
+          mkdir -p out.bin
+          cp -f engine/patricia_avx2_bmi2.exe out.bin/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: patricia-windows-avx2-bmi2
+          path: out.bin/
