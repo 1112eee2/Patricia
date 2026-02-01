@@ -1,79 +1,107 @@
-.PHONY: default build datagen aarch64 cross-aarch64 cross-aarch64-clang avx2 avx2_bmi2 clean
+# =========================
+# Patricia - engine Makefile
+# =========================
 
-EXE := patricia
-SOURCES := src/patricia.cpp src/fathom/src/tbprobe.c
+.PHONY: default build native avx2 avx2_bmi2 datagen clean strip info
 
-# Default compiler (MSYS2/MinGW มักมี clang++ ให้)
-CXX := clang++
-CXXFLAGS := -O3 -std=c++20 -ffast-math
-LINKER :=
+# --- Output base name ---
+EXE      := patricia
 
-ifeq ($(OS), Windows_NT)
+# --- Sources (engine folder is working dir) ---
+SOURCES  := src/patricia.cpp src/fathom/src/tbprobe.c
+
+# --- Toolchain defaults ---
+CXX      ?= clang++
+STRIP    ?= strip
+
+# --- OS detection & suffix/linker flags ---
+ifeq ($(OS),Windows_NT)
 	DETECTED_OS := Windows
-	SUFFIX := .exe
+	SUFFIX      := .exe
+	LINKER      :=
+	# On MinGW/Clang Windows, pthread flags not needed usually, but harmless if present.
+	THREADFLAGS :=
 else
 	DETECTED_OS := $(shell uname -s)
-	LINKER := -lm
-	CXXFLAGS += -pthread
-	SUFFIX :=
+	SUFFIX      :=
+	LINKER      := -lm
+	THREADFLAGS := -pthread
 endif
 
-OUT := $(EXE)$(SUFFIX)
+# --- Common flags ---
+# Keep it portable for CI: don't force -march=native unless target is "native".
+BASE_CXXFLAGS := -O3 -std=c++20 -ffast-math $(THREADFLAGS)
 
-# ----------------------- Native build (generic) ---------------------------
-build: $(SOURCES)
-	$(CXX) $^ $(CXXFLAGS) -o $(OUT) $(LINKER)
+# Default output name
+OUT := $(EXE)$(SUFFIX)
 
 default: build
 
-# ----------------------- Datagen ------------------------------------------
-datagen: datagen/datagen.cpp
-	$(CXX) $^ $(CXXFLAGS) -o data$(SUFFIX) $(LINKER)
+# -------------------------
+# Generic build (portable)
+# -------------------------
+build: OUT := $(EXE)$(SUFFIX)
+build: CXXFLAGS := $(BASE_CXXFLAGS)
+build: $(SOURCES)
+	$(CXX) $^ $(CXXFLAGS) -o $(OUT) $(LINKER)
 
-# ----------------------- AVX2 build ---------------------------------------
-# เอาไว้ทำไบนารีเฉพาะเครื่องที่รองรับ AVX2
-avx2: CXX := clang++
-avx2: CXXFLAGS := -O3 -std=c++20 -ffast-math -mavx2 -mfma -msse4.2 -mpopcnt
+# ---------------------------------------
+# Native build (uses host CPU features)
+# ---------------------------------------
+native: OUT := $(EXE)_native$(SUFFIX)
+native: CXXFLAGS := $(BASE_CXXFLAGS) -march=native
+native: $(SOURCES)
+	$(CXX) $^ $(CXXFLAGS) -o $(OUT) $(LINKER)
+
+# -------------------------
+# AVX2 build
+# -------------------------
 avx2: OUT := $(EXE)_avx2$(SUFFIX)
+avx2: CXXFLAGS := $(BASE_CXXFLAGS) -mavx2 -mfma -msse4.2 -mpopcnt
 avx2: $(SOURCES)
 	$(CXX) $^ $(CXXFLAGS) -o $(OUT) $(LINKER)
 
-# ----------------------- AVX2 + BMI2 build --------------------------------
-# แรงสุด (ต้องรองรับ AVX2 + BMI2)
-avx2_bmi2: CXX := clang++
-avx2_bmi2: CXXFLAGS := -O3 -std=c++20 -ffast-math -mavx2 -mbmi -mbmi2 -mfma -msse4.2 -mpopcnt
+# -----------------------------------
+# AVX2 + BMI2 build (what you want)
+# -----------------------------------
 avx2_bmi2: OUT := $(EXE)_avx2_bmi2$(SUFFIX)
+avx2_bmi2: CXXFLAGS := $(BASE_CXXFLAGS) -mavx2 -mbmi -mbmi2 -mfma -msse4.2 -mpopcnt
 avx2_bmi2: $(SOURCES)
 	$(CXX) $^ $(CXXFLAGS) -o $(OUT) $(LINKER)
 
-# ----------------------- Native AArch64 build (on ARM host) ----------------
-aarch64: CXX := clang++
-aarch64: CXXFLAGS := -O3 -std=c++20 -ffast-math -mcpu=native -pthread -static-libstdc++ -static-libgcc
-aarch64: OUT := $(EXE)_aarch64$(SUFFIX)
-aarch64: $(SOURCES)
+# -------------------------
+# Datagen tool build
+# -------------------------
+datagen: OUT := data$(SUFFIX)
+datagen: CXXFLAGS := $(BASE_CXXFLAGS)
+datagen: datagen/datagen.cpp
 	$(CXX) $^ $(CXXFLAGS) -o $(OUT) $(LINKER)
 
-# ----------------------- Cross-compile for AArch64 (fully static) ----------
-# Usage: make cross-aarch64 CROSS=aarch64-linux-gnu
-cross-aarch64: CROSS ?= aarch64-linux-gnu
-cross-aarch64: CXX := $(CROSS)-g++
-cross-aarch64: CXXFLAGS := -O3 -std=c++20 -ffast-math -march=armv8-a -pthread -static -static-libstdc++ -static-libgcc
-cross-aarch64: OUT := $(EXE)_aarch64$(SUFFIX)
-cross-aarch64: $(SOURCES)
-	$(CXX) $(CXXFLAGS) $^ -o $(OUT)
+# -------------------------
+# Strip (reduce binary size)
+# Usage: make strip OUT=patricia_avx2_bmi2.exe
+# -------------------------
+strip:
+	$(STRIP) -s "$(OUT)"
 
-# ----------------------- Cross-compile for AArch64 using clang -------------
-# requires proper sysroot
-cross-aarch64-clang: CXX := clang++
-cross-aarch64-clang: CXXFLAGS := --target=aarch64-linux-gnu -O3 -std=c++20 -ffast-math -march=armv8-a -pthread -static
-cross-aarch64-clang: OUT := $(EXE)_aarch64$(SUFFIX)
-cross-aarch64-clang: $(SOURCES)
-	$(CXX) $(CXXFLAGS) $^ -o $(OUT) $(LINKER)
-SUFFIX := .exe
-OUT := $(EXE)$(SUFFIX)
-
-
-# ----------------------- Clean --------------------------------------------
+# -------------------------
+# Clean
+# -------------------------
 clean:
-	rm -f $(EXE)$(SUFFIX) $(EXE)_avx2$(SUFFIX) $(EXE)_avx2_bmi2$(SUFFIX) data$(SUFFIX)
+	-@rm -f "$(EXE)$(SUFFIX)" \
+		"$(EXE)_native$(SUFFIX)" \
+		"$(EXE)_avx2$(SUFFIX)" \
+		"$(EXE)_avx2_bmi2$(SUFFIX)" \
+		"data$(SUFFIX)" 2>/dev/null || true
 
+# -------------------------
+# Info
+# -------------------------
+info:
+	@echo OS=$(DETECTED_OS)
+	@echo CXX=$(CXX)
+	@echo STRIP=$(STRIP)
+	@echo SOURCES=$(SOURCES)
+	@echo BASE_CXXFLAGS=$(BASE_CXXFLAGS)
+	@echo LINKER=$(LINKER)
+	@echo SUFFIX=$(SUFFIX)
