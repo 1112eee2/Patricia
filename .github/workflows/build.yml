@@ -23,18 +23,16 @@ jobs:
         install: >
           mingw-w64-ucrt-x86_64-clang
           mingw-w64-ucrt-x86_64-make
-          mingw-w64-ucrt-x86_64-libc++
           mingw-w64-ucrt-x86_64-toolchain
 
     # -------------------------------
-    # Verify tools (debug safety net)
+    # Check toolchain
     # -------------------------------
     - name: Check toolchain
       shell: msys2 {0}
       run: |
         clang++ --version
-        make --version
-        pwd
+        mingw32-make --version
 
     # -------------------------------
     # Build engine
@@ -43,8 +41,8 @@ jobs:
       shell: msys2 {0}
       run: |
         cd engine
-        make clean || true
-        make
+        mingw32-make clean || true
+        mingw32-make
 
     # -------------------------------
     # Rename output to .bin
