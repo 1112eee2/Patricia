@@ -18,8 +18,8 @@ STRIP    ?= strip
 ifeq ($(OS),Windows_NT)
 	DETECTED_OS := Windows
 	SUFFIX      := .exe
-	# Statically link libgcc/libstdc++ to avoid missing DLLs on Windows.
-	LINKER      := -static-libgcc -static-libstdc++
+	# Statically link libgcc/libstdc++ and winpthreads to avoid missing DLLs on Windows.
+	LINKER      := -static-libgcc -static-libstdc++ -Wl,-Bstatic -lwinpthread -Wl,-Bdynamic
 	# On MinGW/Clang Windows, pthread flags not needed usually, but harmless if present.
 	THREADFLAGS :=
 else
