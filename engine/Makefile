@@ -18,7 +18,9 @@ STRIP    ?= strip
 ifeq ($(OS),Windows_NT)
 	DETECTED_OS := Windows
 	SUFFIX      := .exe
-	LINKER      :=
+	# Statically link libgcc/libstdc++ and winpthreads to avoid missing DLLs on Windows.
+	# Use -static to force all MinGW runtime deps into the executable.
+	LINKER      := -static -static-libgcc -static-libstdc++ -lwinpthread
 	# On MinGW/Clang Windows, pthread flags not needed usually, but harmless if present.
 	THREADFLAGS :=
 else
