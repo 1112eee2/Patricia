@@ -19,12 +19,16 @@ ifeq ($(OS),Windows_NT)
 	DETECTED_OS := Windows
 	SUFFIX      := .exe
 	LINKER      :=
+	# Build a standalone .exe (no libstdc++/libgcc/winpthread DLL required).
+	# Useful for shipping CI artifacts that run on clean Windows machines.
+	RUNTIME_LDFLAGS := -static -static-libgcc -static-libstdc++
 	# On MinGW/Clang Windows, pthread flags not needed usually, but harmless if present.
 	THREADFLAGS :=
 else
 	DETECTED_OS := $(shell uname -s)
 	SUFFIX      :=
 	LINKER      := -lm
+	RUNTIME_LDFLAGS :=
 	THREADFLAGS := -pthread
 endif
 
@@ -43,7 +47,7 @@ default: build
 build: OUT := $(EXE)$(SUFFIX)
 build: CXXFLAGS := $(BASE_CXXFLAGS)
 build: $(SOURCES)
-	$(CXX) $^ $(CXXFLAGS) -o $(OUT) $(LINKER)
+	$(CXX) $^ $(CXXFLAGS) -o $(OUT) $(RUNTIME_LDFLAGS) $(LINKER)
 
 # ---------------------------------------
 # Native build (uses host CPU features)
@@ -51,7 +55,7 @@ build: $(SOURCES)
 native: OUT := $(EXE)_native$(SUFFIX)
 native: CXXFLAGS := $(BASE_CXXFLAGS) -march=native
 native: $(SOURCES)
-	$(CXX) $^ $(CXXFLAGS) -o $(OUT) $(LINKER)
+	$(CXX) $^ $(CXXFLAGS) -o $(OUT) $(RUNTIME_LDFLAGS) $(LINKER)
 
 # -------------------------
 # AVX2 build
@@ -59,7 +63,7 @@ native: $(SOURCES)
 avx2: OUT := $(EXE)_avx2$(SUFFIX)
 avx2: CXXFLAGS := $(BASE_CXXFLAGS) -mavx2 -mfma -msse4.2 -mpopcnt
 avx2: $(SOURCES)
-	$(CXX) $^ $(CXXFLAGS) -o $(OUT) $(LINKER)
+	$(CXX) $^ $(CXXFLAGS) -o $(OUT) $(RUNTIME_LDFLAGS) $(LINKER)
 
 # -----------------------------------
 # AVX2 + BMI2 build (what you want)
@@ -67,7 +71,7 @@ avx2: $(SOURCES)
 avx2_bmi2: OUT := $(EXE)_avx2_bmi2$(SUFFIX)
 avx2_bmi2: CXXFLAGS := $(BASE_CXXFLAGS) -mavx2 -mbmi -mbmi2 -mfma -msse4.2 -mpopcnt
 avx2_bmi2: $(SOURCES)
-	$(CXX) $^ $(CXXFLAGS) -o $(OUT) $(LINKER)
+	$(CXX) $^ $(CXXFLAGS) -o $(OUT) $(RUNTIME_LDFLAGS) $(LINKER)
 
 # -------------------------
 # Datagen tool build
@@ -75,7 +79,7 @@ avx2_bmi2: $(SOURCES)
 datagen: OUT := data$(SUFFIX)
 datagen: CXXFLAGS := $(BASE_CXXFLAGS)
 datagen: datagen/datagen.cpp
-	$(CXX) $^ $(CXXFLAGS) -o $(OUT) $(LINKER)
+	$(CXX) $^ $(CXXFLAGS) -o $(OUT) $(RUNTIME_LDFLAGS) $(LINKER)
 
 # -------------------------
 # Strip (reduce binary size)
@@ -103,5 +107,6 @@ info:
 	@echo STRIP=$(STRIP)
 	@echo SOURCES=$(SOURCES)
 	@echo BASE_CXXFLAGS=$(BASE_CXXFLAGS)
+	@echo RUNTIME_LDFLAGS=$(RUNTIME_LDFLAGS)
 	@echo LINKER=$(LINKER)
 	@echo SUFFIX=$(SUFFIX)
